@@ -25,5 +25,5 @@ async def test_read_message_response():
         response = await client.get(f"/message/{day}")
         assert response.status_code == 200
         data = response.json()
-        assert data["message"] == "Test Work flow"
+        assert data["message"] == "Test Workflow"
         assert data["day"] == day
