@@ -9,6 +9,6 @@ async def health_check():
 @app.get("/message/{day}")
 async def read_message(day: int):
     return {
-        "message": "Day 1 of my project",
+        "message": "Test Workflow",
         "day": day
     }
