@@ -10,9 +10,7 @@ api_key = os.environ.get("GROQ_API_KEY")
 
 def get_system_prompt() -> str:
     with open("../text/system_prompt.md", "r", encoding="utf-8") as f:
-        system_prompt = f.read()
-    return system_prompt
-
+        return f.read()
 
 def get_diff() -> str:
     # 1. stdin (pipe)
@@ -23,16 +21,18 @@ def get_diff() -> str:
 
     # 2. file fallback
     diff_file = Path("../text/diff.txt")
-    return diff_file.read_text(encoding="utf-8")
+    if diff_file.exists():
+        return diff_file.read_text(encoding="utf-8")
+
+    # 3. final fallback
+    return ""
 
 
 def get_user_prompt(diff: str) -> str:
     user_prompt = f"""
         Review this git diff:
 
-        <diff>
         {diff}
-        <diff>
     """
     return user_prompt
 
@@ -48,12 +48,10 @@ def generate_review(diff: str) -> str:
     client = Groq(api_key=api_key)
     response = client.chat.completions.create(
         model="llama-3.1-8b-instant",
-        messages=[{
-            "role": "system",
-            "content": system_prompt,
-            "role": "user", 
-            "content": user_prompt
-        }]
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
     )
     review_text = response.choices[0].message.content
     return review_text
@@ -62,7 +60,7 @@ def generate_review(diff: str) -> str:
 def get_ai_review() -> str:
     # Testcase 1: Empty diff
     diff = get_diff()
-    if not diff or diff.strip() == "":
+    if not diff.strip():
         return "No diff found"
     
     # Testcase 2 & 3: Rate limit & API error
@@ -71,9 +69,9 @@ def get_ai_review() -> str:
             return generate_review(diff)
         except RateLimitError:
             time.sleep(2 ** i)
-            diff = diff[:8000 // (i + 1)] # should use another way to reduce the complexity
+            diff = diff[:8000] # should use another way to reduce the complexity
 
-    raise Exception("Rate Limit")
+    raise Exception("Rate limit exceeded after retries")
     
 
 def main():
