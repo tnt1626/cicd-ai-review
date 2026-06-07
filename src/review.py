@@ -1,8 +1,9 @@
 import os
 import sys
 from pathlib import Path
+import time
 from dotenv import load_dotenv
-from groq import Groq
+from groq import Groq, RateLimitError
 
 load_dotenv()
 api_key = os.environ.get("GROQ_API_KEY")
@@ -39,8 +40,11 @@ def save_review_text(review_text: str):
     with open("../text/review.md", "w", encoding="utf-8") as f:
         f.write(review_text)
 
-# TODO: handle errors
-def get_ai_review(user_prompt: str, system_prompt: str) -> str:
+
+def generate_review(diff: str) -> str:
+    user_prompt = get_user_prompt(diff)
+    system_prompt = get_system_prompt()
+
     client = Groq(api_key=api_key)
     response = client.chat.completions.create(
         model="llama-3.1-8b-instant",
@@ -54,12 +58,26 @@ def get_ai_review(user_prompt: str, system_prompt: str) -> str:
     review_text = response.choices[0].message.content
     return review_text
 
-def main():
-    system_prompt = get_system_prompt()
-    diff = get_diff()
-    user_prompt = get_user_prompt(diff)
 
-    review_text = get_ai_review(user_prompt, system_prompt)
+def get_ai_review() -> str:
+    # Testcase 1: Empty diff
+    diff = get_diff()
+    if not diff or diff.strip() == "":
+        return "No diff found"
+    
+    # Testcase 2 & 3: Rate limit & API error
+    for i in range(3):
+        try:
+            return generate_review(diff)
+        except RateLimitError:
+            time.sleep(2 ** i)
+            diff = diff[:8000 // (i + 1)] # should use another way to reduce the complexity
+
+    raise Exception("Rate Limit")
+    
+
+def main():
+    review_text = get_ai_review()
     save_review_text(review_text)
 
     print(review_text)
