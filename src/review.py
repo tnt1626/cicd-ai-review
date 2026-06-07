@@ -3,13 +3,29 @@ import sys
 from pathlib import Path
 import time
 from dotenv import load_dotenv
-from groq import Groq, RateLimitError
+from groq import APIError, Groq, RateLimitError
 
 load_dotenv()
 api_key = os.environ.get("GROQ_API_KEY")
+if not api_key:
+    raise EnvironmentError("GROQ_API_KEY is not set. Add it to your .env file or GitHub Secrets.")
+client = Groq(api_key=api_key)
+
+def truncate_diff(diff: str, max_chars: int = 8000) -> str:
+    if len(diff) <= max_chars:
+        return diff
+    lines, result, count = diff.splitlines(), [], 0
+    for line in lines:
+        if count + len(line) > max_chars:
+            break
+        result.append(line)
+        count += len(line)
+    return "\n".join(result) + "\n\n[diff truncated — too large]"
+
 
 def get_system_prompt() -> str:
-    with open("../text/system_prompt.md", "r", encoding="utf-8") as f:
+    file_path = Path(__file__).parent.parent / "text" / "system_prompt.md"
+    with open(file_path, "r", encoding="utf-8") as f:
         return f.read()
 
 def get_diff() -> str:
@@ -29,25 +45,21 @@ def get_diff() -> str:
 
 
 def get_user_prompt(diff: str) -> str:
-    user_prompt = f"""
-        Review this git diff:
-
-        {diff}
-    """
-    return user_prompt
+    return f"Review this git diff:\n\n{diff}"
 
 def save_review_text(review_text: str):
-    with open("../text/review.md", "w", encoding="utf-8") as f:
-        f.write(review_text)
+    file_path = Path(__file__).parent.parent / "text" / "review.md"
+    with open(file_path, "w", encoding="utf-8") as f:
+            f.write(review_text)
 
 
 def generate_review(diff: str) -> str:
     user_prompt = get_user_prompt(diff)
     system_prompt = get_system_prompt()
 
-    client = Groq(api_key=api_key)
     response = client.chat.completions.create(
         model="llama-3.1-8b-instant",
+        max_tokens=1024,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
@@ -63,13 +75,18 @@ def get_ai_review() -> str:
     if not diff.strip():
         return "No diff found"
     
+    diff = truncate_diff(diff)
+    
     # Testcase 2 & 3: Rate limit & API error
     for i in range(3):
         try:
             return generate_review(diff)
-        except RateLimitError:
+        
+        except (RateLimitError, APIError) as e:
+            if i == 2:
+                raise
+            print(f"[retry {i+1}/3] {type(e).__name__}: {e}", file=sys.stderr)
             time.sleep(2 ** i)
-            diff = diff[:8000] # should use another way to reduce the complexity
 
     raise Exception("Rate limit exceeded after retries")
     
