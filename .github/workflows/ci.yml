@@ -67,7 +67,7 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
-          username: gcp_deploy
+          username: gcp-deploy
           key: ${{secrets.VPS_KEY }}
           script: |
             docker pull ${{ vars.DOCKER_HUB_USERNAME }}/cicd-app:${{ github.sha }}
