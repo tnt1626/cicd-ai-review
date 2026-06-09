@@ -36,7 +36,7 @@ def get_diff() -> str:
             return diff
 
     # 2. file fallback
-    diff_file = Path("../text/diff.txt")
+    diff_file = Path(__file__).parent.parent / "text" / "diff.txt"
     if diff_file.exists():
         return diff_file.read_text(encoding="utf-8")
 
