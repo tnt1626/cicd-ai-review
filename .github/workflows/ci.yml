@@ -56,4 +56,22 @@ jobs:
           tags: |
             ${{ vars.DOCKER_HUB_USERNAME }}/cicd-app:latest
             ${{ vars.DOCKER_HUB_USERNAME }}/cicd-app:${{ github.sha }}
-            
+
+  deploy:
+    needs: build
+
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Sign in and push to VM instance
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: gcp_deploy
+          key: ${{secrets.VPS_KEY }}
+          script: |
+            docker pull ${{ vars.DOCKER_HUB_USERNAME }}/cicd-app/${{ github.sha }}
+            docker stop app || true
+            docker rm app || true
+            docker run -d --name app -p 8000:8000 \
+            ${{ vars.DOCKER_HUB_USERNAME }}/cicd-app/${{ github.sha }}
