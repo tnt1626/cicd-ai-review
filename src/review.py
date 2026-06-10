@@ -16,7 +16,7 @@ client = Groq(api_key=api_key)
 github_token = os.environ.get("GITHUB_TOKEN")
 github_repository = os.environ.get("GITHUB_REPOSITORY")
 
-def truncate_diff(diff: str, max_chars: int = 8000) -> str:
+def truncate_diff(diff: str, max_chars: int = 60000) -> str:
     if len(diff) <= max_chars:
         return diff
     lines, result, count = diff.splitlines(), [], 0
