@@ -1,7 +1,9 @@
 import os
 import sys
-from pathlib import Path
 import time
+import argparse
+import requests
+from pathlib import Path
 from dotenv import load_dotenv
 from groq import APIError, Groq, RateLimitError
 
@@ -10,6 +12,10 @@ api_key = os.environ.get("GROQ_API_KEY")
 if not api_key:
     raise EnvironmentError("GROQ_API_KEY is not set. Add it to your .env file or GitHub Secrets.")
 client = Groq(api_key=api_key)
+
+github_token = os.environ.get("GITHUB_TOKEN")
+github_repository = os.environ.get("GITHUB_REPOSITORY")
+pr_number = os.environ.get("PR_NUMBER")
 
 def truncate_diff(diff: str, max_chars: int = 8000) -> str:
     if len(diff) <= max_chars:
@@ -89,11 +95,49 @@ def get_ai_review() -> str:
             time.sleep(2 ** i)
 
     raise Exception("Rate limit exceeded after retries")
+
+def post_review_comment(review_text: str) -> None:
+    if not all([github_token, github_repository, pr_number]):
+        print("GitHub env vars not set - skipping PR comment")
+        return
+
+    url = f"https://api.github.com/repos/{github_repository}/issues/{pr_number}/comments"
+    headers = {
+        "Authorization": f"Bearer {github_token}",
+        "Accept": "application/vnd.github+json"
+    }
+
+    response = requests.post(
+        url=url,
+        headers=headers,
+        json={"body": review_text}
+    )
+
+    if response.status_code == 200:
+        print(f"Review posted to PR #{pr_number}")
+    else:
+        print(f"GitHub API {response.status_code}: {response.text}")
     
 
 def main():
+    parser = argparse.ArgumentParser(description="Pull Request Trigger")
+    parser.add_argument(
+        "--pr-number",
+        type=int,
+        help="Number of pull request"
+    )
+    parser.add_argument(
+        "--repo",
+        default="cicd-ai-review",
+        help="Name of repository"
+    )
+    args = parser.parse_args()
+    pr_number = args.pr_number
+    repo = args.repo
+
     review_text = get_ai_review()
     save_review_text(review_text)
+    post_review_comment(review_text)
 
     print(review_text)
 
