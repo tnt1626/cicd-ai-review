@@ -14,7 +14,7 @@ A GitHub Actions pipeline that automatically tests, builds a Docker image, deplo
 | Test | pytest + httpx |
 | Container | Docker + Docker Hub |
 | CI/CD | GitHub Actions |
-| AI | Groq API (Llama 3.1-8b-instant) |
+| AI | Groq API (Llama-3.3-70b-versatile) |
 | Server | GCP e2-micro + Nginx + HTTPS (nip.io) |
 
 ---
