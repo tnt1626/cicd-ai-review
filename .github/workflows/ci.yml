@@ -103,7 +103,7 @@ jobs:
         run: uv sync --frozen
 
       - name: Generate diff
-        run: git diff origin/main...HEAD > src/text/diff.txt
+        run: git diff origin/main...HEAD > text/diff.txt
 
       - name: Run AI review
         env:
