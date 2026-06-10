@@ -1,67 +1,128 @@
 ![CI](https://github.com/tnt1626/cicd-ai-review/actions/workflows/ci.yml/badge.svg)
 
-# 1. Project này làm gì?
-- Xây dựng github action pipeline, bao gồm:
-    + test
-    + build a Docker image
-    + deploy to a VPS
-    + automatically post an ai-review comment on every pull request
+# cicd-ai-review
 
-# 2. Stack được sử dụng trong project
-- FastAPI 
-- Python
-- pytest + Docker 
-- GitHub Actions 
-- Groq API 
-- Nginx 
-- Linux VPS
+A GitHub Actions pipeline that automatically tests, builds a Docker image, deploys to a GCP VM, and posts an AI-powered code review comment on every Pull Request using Llama 3 via Groq.
 
-# 3. Project này giải quyết vấn đề gì
-## 3.1 Những vấn đề mà CICD giải 
-- Phát triển và triển khai thủ công, chậm chạp và dễ gặp lỗi
-- Khi merge nhiều nhánh dễ tạo ra conflict
-- Quy trình test và build code ở final stage dẫn đến bug tìm ra trễ
-- Việc triển khai tốn nhiều thời gian
+---
 
-## 3.2 AI-review automatically đã giải quyết những gì
-- Tóm tắt nội dung vừa được PR
-- Nêu ra những điểm tốt và bug hoặc lỗi tìm ẩn của PR ở dòng nào và file 
-- Đưa ra hướng cải tiến cho đoạn code vừa được PR (optional)
+## Stack
 
-# 4. Phần nào khó nhất khi build
-- Những nội dung liên quan đến máy ảo và mạng máy tính
-    - Chưa được trang bị nhiều kiến thức liên quan đến mạng máy tính như: tường lửa, proxy, reverse proxy, ssl, http, https
-> Tuy là nội dung cảm thấy khó nhất nhưng cũng mạng lại rất nhiều kiến thức và khiến mình cảm thấy rất hào hứng
+| Layer | Tool |
+|---|---|
+| API | FastAPI + Python 3.13 |
+| Test | pytest + httpx |
+| Container | Docker + Docker Hub |
+| CI/CD | GitHub Actions |
+| AI | Groq API (Llama 3.1-8b-instant) |
+| Server | GCP e2-micro + Nginx + HTTPS (nip.io) |
 
-- Lần đầu làm quen với github action nên khá lạ lẫm với cách viết và logic
+---
 
-# 5. Những nội dung đã học được sau project này
-- Được thực hành nhiều hơn với Docker, DockerHub, Dockerfile, Docker CLI, đặc biệt là các image hoàn toàn mới...
-- Biết về cách hoạt động của GitHub Action, set các secret và variables 
-- Biết thêm nhiều nội dung hơn về Linux, đặc biệt là các nội dung liên quan đến hệ  (tôi đang sử dụng Linux nhưng chưa có cơ hội làm việc với Linux là 1 server)
-- Được ôn lại kiến thức về backend (REST API, http methods, path, headers, media types,..) và test với pytest
-- Biết cách setup cấu hình và tạo 1 VM instance với GCP, làm việc SSH public và private key
-- Làm quen với các kiến thức về mạng máy tính: firewall, proxy, reverse proxy
-
-# 6. Architecture Diagram
+## Architecture
 
 ![Architecture Diagram](attachments/cicd_ai_review_architecture.svg)
 
-# 7. How to run locally
-1. Clone repository
+**Two independent flows run on every event:**
+
+**Flow A — Pull Request:** When a PR is opened, the `ai-review` job generates a git diff, sends it to Llama 3 via Groq, and posts the review as a PR comment via the GitHub API.
+
+**Flow B — Push to main:** When code is merged, the pipeline runs tests → builds and pushes a Docker image to Docker Hub → SSHs into the GCP VM and redeploys the container.
+
+---
+
+## How it works
+
+### AI Code Review Bot
+
+Every time you open a Pull Request:
+
+1. GitHub Actions checks out the branch with full history
+2. Generates a diff: `git diff origin/main...HEAD`
+3. Sends the diff to Llama 3 (via Groq API) with a structured system prompt
+4. Posts the review as a comment on the PR via the GitHub Issues API
+
+The review follows a fixed format — summary, good practices, bugs, security issues, code quality, and optional suggestions.
+
+*PR with bot comment triggered:*
+![Bot comment overview](attachments/bot_comment_1.png)
+
+*Full review — bugs, security, suggestions with file:line references:*
+![Bot comment detail](attachments/bot_comment_2.png)
+
+### CI/CD Pipeline
+
+```
+push to main
+    │
+    ├── test job       → pytest (Python 3.12, 3.13 matrix)
+    │
+    ├── build job      → docker build + push to Docker Hub (tagged with commit SHA)
+    │
+    └── deploy job     → SSH into GCP VM → docker pull → docker run
+```
+
+---
+
+## How to run locally
+
+**Prerequisites:** Python 3.13, `uv`, Docker, a Groq API key
+
 ```bash
-git clone <repo-url>
+# 1. Clone the repo
+git clone https://github.com/tnt1626/cicd-ai-review.git
 cd cicd-ai-review
-```
 
-2. Install dependencies
-```bash
+# 2. Install dependencies
 uv sync
+
+# 3. Set environment variables
+cp .env.example .env
+# Fill in GROQ_API_KEY in .env
+
+# 4. Run the app
+uv run uvicorn src.main:app --reload
+
+# 5. Run tests
+uv run pytest
+
+# 6. Test the AI review script locally
+git diff main | uv run -m src.review --pr-number 1 --repo your-username/cicd-ai-review
 ```
 
-# 8. "How it workds" section and demo with screen shot
+---
 
-# 9. GitHub Secrets and how to set them up
+## GitHub Secrets setup
 
+Go to your repo → **Settings → Secrets and variables → Actions → New repository secret**
 
+| Secret | How to get it |
+|---|---|
+| `GROQ_API_KEY` | [console.groq.com](https://console.groq.com) → API Keys |
+| `GITHUB_TOKEN` | Auto-injected by GitHub Actions — no setup needed |
+| `DOCKERHUB_USERNAME` | Your Docker Hub username (set as a **variable**, not secret) |
+| `DOCKERHUB_TOKEN` | Docker Hub → Account Settings → Security → Access Tokens |
+| `VPS_HOST` | External IP of your GCP VM (Compute Engine → VM Instances) |
+| `VPS_KEY` | SSH private key — run `ssh-keygen -t ed25519 -C "gcp-deploy"` locally, paste the private key here |
 
+---
+
+## What I learned
+
+This was a 2-week project built from scratch as a beginner to DevOps. The hardest parts were networking concepts (firewall, reverse proxy, SSL/HTTPS) and learning GitHub Actions syntax — both of which ended up being the most valuable things I took away.
+
+- **Docker** — Dockerfile, Docker Hub, image tagging, container lifecycle
+- **GitHub Actions** — multi-job pipelines, secrets, matrix strategy, conditional jobs
+- **Linux server administration** — UFW firewall, user management, SSH keys
+- **Networking** — reverse proxy with Nginx, HTTPS with Certbot/Let's Encrypt
+- **Cloud infrastructure** — provisioning and configuring a GCP e2-micro VM (always-free tier)
+- **AI integration** — Groq API, prompt engineering, GitHub REST API for automated comments
+
+---
+
+## Possible extensions
+
+- [ ] Webhook server — support any repo without GitHub Actions setup
+- [ ] Web dashboard — view review history and stats
+- [ ] Terraform — provision the GCP VM with IaC instead of manual setup
+- [ ] Kubernetes — replace `docker run` with a k8s deployment
