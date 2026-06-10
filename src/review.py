@@ -113,7 +113,7 @@ def post_review_comment(review_text: str) -> None:
         json={"body": review_text}
     )
 
-    if response.status_code == 200:
+    if response.status_code == 201:
         print(f"Review posted to PR #{pr_number}")
     else:
         print(f"GitHub API {response.status_code}: {response.text}")

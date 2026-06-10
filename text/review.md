@@ -1,48 +1,55 @@
-Here's a review of the code:
-
-**Security Issues**
-
-* The `diff` variable is being read from a file, but the file path is hardcoded. This could be a problem if the file path is changed or if the file is moved. Consider using a more robust way to load the file, such as a configuration value.
-* The `Groq` API key is being loaded from the environment, which is good practice. However, you should also consider validating that the key is present before trying to use it.
-
-**Bugs**
-
-* The `response` variable is not checked for any errors before trying to access its `choices` attribute. This could raise an exception if the API request fails.
-* The `choices` attribute is not checked for an empty list before trying to access its elements. This could raise an exception if there are no choices.
-
-**Code Quality**
-
-* The `system_prompt` and `user_prompt` variables are defined but not used anywhere except to create a dictionary with duplicate keys. Consider removing these duplicates or creating two separate dictionaries.
-* The `diff` variable is not used anywhere except to create a dictionary with a redundant value. Consider removing this redundant value.
-* The code does not follow the PEP 8 style guide, which recommends using consistent spacing and indentation.
-
-**Specific Changes**
-
-1. Add error handling for the `Groq` API request:
+**Bug 1: Environment Variables Inaccessibility**
 ```python
-try:
-    response = client.chat.completions.create(...)
-except Exception as e:
-    print(f"Error: {e}")
-    sys.exit(1)
+github_token = os.environ.get("GITHUB_TOKEN")
+github_repository = os.environ.get("GITHUB_REPOSITORY")
+pr_number = os.environ.get("PR_NUMBER")
 ```
-2. Remove duplicate keys from the `messages` dictionary:
+The `os.environ.get()` method is used to retrieve environment variables. However, in some environments (e.g., GitHub Actions), these variables might be not be accessible through the `os` module. Instead, use the `context.env` object available in GitHub Actions: `context.env.GITHUB_TOKEN`, `context.repo.owner` and `context.repo.repo`, `github.context.pull_request.number`.
+
+**Bug 2: ArgumentParser**
 ```python
-messages = [
-    {"role": "system", "content": system_prompt},
-    {"role": "user", "content": user_prompt},
-]
+parser = argparse.ArgumentParser(description="Pull Request Trigger")
+parser.add_argument(
+    "--pr-number",
+    type=int,
+    help="Number of pull request"
+)
 ```
-3. Validate the `GROQ_API_KEY` environment variable before trying to use it:
+The `argparse.ArgumentParser` is used to parse command-line arguments. However, in GitHub Actions, the `event` object already contains the pull request number as `github.context.pull_request.number`. 
+
+**Bug 3: GitHub API Request**
 ```python
-if "GROQ_API_KEY" not in os.environ:
-    raise ValueError("GROQ_API_KEY environment variable is not set")
+url = f"https://api.github.com/repos/{github_repository}/issues/{pr_number}/comments"
 ```
-4. Remove redundant `diff` variable:
+Using string formatting to build the GitHub API URL can potentially lead to vulnerabilities. Instead, use the `f-strings` with the variables directly: `f"https://api.github.com/repos/{github_repository}/issues/{pr_number}/comments"`
+
+**Bug 4: Response Handling**
 ```python
-user_prompt = f"""
-    Review this git diff:
-    
-    {diff}
-"""
+if response.status_code == 200:
+    print(f"Review posted to PR #{pr_number}")
+else:
+    print(f"GitHub API {response.status_code}: {response.text}")
 ```
+The code only prints the response status code and text. It does not handle potential exceptions or rate limits. Consider adding proper error handling using a try-except block.
+
+**Security Issue: Unprotected API Key**
+The API key for GitHub is stored in an environment variable. However, in a real-world scenario, you should not be using your actual API token in plain text. Consider using a secrets management solution like HashiCorp's Vault or AWS Secrets Manager instead.
+
+**Security Issue: Insecure Request Headers**
+```python
+headers = {
+    "Authorization": f"Bearer {github_token}",
+    "Accept": "application/vnd.github+json"
+}
+```
+The authorization token is stored in plain text. This is a potential security risk. Consider storing the token securely or using a more secure authorization method.
+
+**Code Quality Issue: Duplicate Variable**
+```python
+pr_number = os.environ.get("PR_NUMBER")
+pr_number = args.pr_number
+```
+The variable `pr_number` is reassigned twice. Consider removing the duplicate variable assignment.
+
+**Code Quality Issue: Missing Type Hinting**
+Some functions and variables are missing type hints. Consider adding type hints to improve code readability and maintainability.
