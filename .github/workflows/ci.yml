@@ -1,7 +1,5 @@
-# Name of this action
 name: GitHub Actions CI Workflow
 
-# Triggers
 on:
   push:
     branches: 
@@ -9,6 +7,10 @@ on:
   pull_request:
     branches: 
         - main
+
+permissions:
+  pull-requests: write
+  contents: read
 
 jobs:
   test:
@@ -36,7 +38,11 @@ jobs:
     needs: test
 
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Login to Docker Hub
         uses: docker/login-action@v4
         with: 
@@ -68,10 +74,42 @@ jobs:
         with:
           host: ${{ secrets.VPS_HOST }}
           username: gcp-deploy
-          key: ${{secrets.VPS_KEY }}
+          key: ${{ secrets.VPS_KEY }}
           script: |
             docker pull ${{ vars.DOCKER_HUB_USERNAME }}/cicd-app:${{ github.sha }}
             docker stop app || true
             docker rm app || true
             docker run -d --name app -p 8000:8000 \
-            ${{ vars.DOCKER_HUB_USERNAME }}/cicd-app:${{ github.sha }}
+              ${{ vars.DOCKER_HUB_USERNAME }}/cicd-app:${{ github.sha }}
+
+  ai-reviews:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+            python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Generate diff
+        run: git diff origin/main...HEAD > src/text/diff.txt
+
+      - name: Run AI review
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          uv run -m src.review \
+            --pr-number ${{ github.event.pull_request.number }} \
+            --repo ${{ github.repository }}
