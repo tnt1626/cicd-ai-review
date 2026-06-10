@@ -16,7 +16,7 @@ client = Groq(api_key=api_key)
 github_token = os.environ.get("GITHUB_TOKEN")
 github_repository = os.environ.get("GITHUB_REPOSITORY")
 
-def truncate_diff(diff: str, max_chars: int = 60000) -> str:
+def truncate_diff(diff: str, max_chars: int = 15000) -> str:
     if len(diff) <= max_chars:
         return diff
     lines, result, count = diff.splitlines(), [], 0
@@ -63,7 +63,7 @@ def generate_review(diff: str) -> str:
     system_prompt = get_system_prompt()
 
     response = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
+        model="llama-3.3-70b-versatile",
         max_tokens=1024,
         messages=[
             {"role": "system", "content": system_prompt},
