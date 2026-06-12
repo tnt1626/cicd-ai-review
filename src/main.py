@@ -12,3 +12,7 @@ async def read_message(day: int):
         "message": "Test Workflow",
         "day": day
     }
+
+@app.get("/test/{day}")
+async def read_message(day: int):
+    return f"Test {day}"
