@@ -7,7 +7,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from groq import APIError, Groq, RateLimitError
 
-# load_dotenv()
+load_dotenv()
 api_key = os.environ.get("GROQ_API_KEY")
 if not api_key:
     raise EnvironmentError("GROQ_API_KEY is not set. Add it to your .env file or GitHub Secrets.")
