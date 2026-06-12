@@ -8,10 +8,8 @@ from dotenv import load_dotenv
 from groq import APIError, Groq, RateLimitError
 
 load_dotenv()
-api_key = os.environ.get("GROQ_API_KEY")
-if not api_key:
-    raise EnvironmentError("GROQ_API_KEY is not set. Add it to your .env file or GitHub Secrets.")
-client = Groq(api_key=api_key)
+
+client = None
 
 github_token = os.environ.get("GITHUB_TOKEN")
 github_repository = os.environ.get("GITHUB_REPOSITORY")
@@ -119,6 +117,12 @@ def post_review_comment(review_text: str, pr_num: str, repo: str) -> None:
 
 
 def main():
+    global client
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        raise EnvironmentError("GROQ_API_KEY is not set. Add it to your .env file or GitHub Secrets.")
+    client = Groq(api_key=api_key)
+
     parser = argparse.ArgumentParser(description="AI Code Review Bot")
     parser.add_argument("--pr-number", type=int, help="Pull request number")
     parser.add_argument("--repo", default=github_repository, help="owner/repo format")
