@@ -8,6 +8,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from groq import APIError, Groq, RateLimitError
 
+PROMPT_VERSION = 'v0.2'
+
 load_dotenv()
 api_key = os.environ.get("GROQ_API_KEY")
 if not api_key:
@@ -68,7 +70,7 @@ def generate_review(diff: str) -> str:
     with mlflow.start_run():
         try:
             mlflow.log_param('model_name', 'llama-3.3-70b-versatile')
-            mlflow.log_param('prompt_version', 'v0.1')
+            mlflow.log_param('prompt_version', PROMPT_VERSION)
             mlflow.log_param('truncated', len(diff) >= 15000)
             mlflow.log_metric('diff_size_chars', len(diff))
 
@@ -76,6 +78,8 @@ def generate_review(diff: str) -> str:
             system_prompt = get_system_prompt()
             mlflow.log_text(system_prompt, "system_prompt.md")
             mlflow.log_text(diff, "input_diff.txt")
+
+            mlflow.log_artifact(str(Path(__file__).parent.parent / "text" / "system_prompt.md"))
 
             start_time = time.perf_counter()
             response = client.chat.completions.create(
