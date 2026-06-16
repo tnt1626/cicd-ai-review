@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+*.db
+mlflow.db
+mlartifacts
+text/diff.txt
+text/review.md

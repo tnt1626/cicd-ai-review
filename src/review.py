@@ -3,6 +3,7 @@ import sys
 import time
 import argparse
 import requests
+import mlflow
 from pathlib import Path
 from dotenv import load_dotenv
 from groq import APIError, Groq, RateLimitError
@@ -15,6 +16,10 @@ client = Groq(api_key=api_key)
 
 github_token = os.environ.get("GITHUB_TOKEN")
 github_repository = os.environ.get("GITHUB_REPOSITORY")
+
+def prepare_mlflow_run():
+    mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5000"))
+    mlflow.set_experiment("cicd-ai-review")
 
 def truncate_diff(diff: str, max_chars: int = 15000) -> str:
     if len(diff) <= max_chars:
@@ -59,30 +64,57 @@ def save_review_text(review_text: str):
 
 
 def generate_review(diff: str) -> str:
-    user_prompt = get_user_prompt(diff)
-    system_prompt = get_system_prompt()
+    prepare_mlflow_run()
+    with mlflow.start_run():
+        try:
+            mlflow.log_param('model_name', 'llama-3.3-70b-versatile')
+            mlflow.log_param('prompt_version', 'v0.1')
+            mlflow.log_param('truncated', len(diff) >= 15000)
+            mlflow.log_metric('diff_size_chars', len(diff))
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        max_tokens=1024,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
-    )
-    review_text = response.choices[0].message.content
+            user_prompt = get_user_prompt(diff)
+            system_prompt = get_system_prompt()
+            mlflow.log_text(system_prompt, "system_prompt.md")
+            mlflow.log_text(diff, "input_diff.txt")
+
+            start_time = time.perf_counter()
+            response = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                max_tokens=1024,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ]
+            )    
+            end_time = time.perf_counter()
+            response_latency_seconds = end_time - start_time
+
+            mlflow.log_metric('token_count_input', response.usage.prompt_tokens)
+            mlflow.log_metric('token_count_output', response.usage.completion_tokens)
+            mlflow.log_metric('latency_seconds', round(response_latency_seconds, 2))
+            mlflow.log_metric('token_per_second', round(response.usage.completion_tokens / response_latency_seconds, 1))
+
+            review_text = response.choices[0].message.content
+            mlflow.log_text(review_text, "review_output.md")
+
+            mlflow.set_tag('status', 'success')
+        except Exception as e:
+            mlflow.set_tag('status', 'failed')
+            mlflow.set_tag('error', str(e))
+            raise
+
     return review_text
 
 
 def get_ai_review() -> str:
-    # Testcase 1: Empty diff
+    # Empty diff
     diff = get_diff()
     if not diff.strip():
         return "No diff found"
     
     diff = truncate_diff(diff)
     
-    # Testcase 2 & 3: Rate limit & API error
+    # Rate limit & API error
     for i in range(3):
         try:
             return generate_review(diff)
@@ -93,7 +125,6 @@ def get_ai_review() -> str:
             print(f"[retry {i+1}/3] {type(e).__name__}: {e}", file=sys.stderr)
             time.sleep(2 ** i)
 
-    raise Exception("Rate limit exceeded after retries")
 
 def post_review_comment(review_text: str, pr_num: str, repo: str) -> None:
     if not github_token:
@@ -124,7 +155,12 @@ def main():
     parser.add_argument("--repo", default=github_repository, help="owner/repo format")
     args = parser.parse_args()
 
-    review_text = get_ai_review()
+    try:
+        review_text = get_ai_review()
+    except Exception as e:
+        print(f"[fatal] {e}", file=sys.stderr)
+        sys.exit(1)
+
     save_review_text(review_text)
     post_review_comment(review_text, str(args.pr_number), args.repo)
     print(review_text)
