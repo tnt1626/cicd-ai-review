@@ -18,10 +18,11 @@ client = Groq(api_key=api_key)
 
 github_token = os.environ.get("GITHUB_TOKEN")
 github_repository = os.environ.get("GITHUB_REPOSITORY")
+env = os.environ.get("ENV", "dev")
 
 def prepare_mlflow_run():
     mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5000"))
-    mlflow.set_experiment("cicd-ai-review")
+    mlflow.set_experiment(f"pr-reviews-{env}")
 
 def truncate_diff(diff: str, max_chars: int = 15000) -> str:
     if len(diff) <= max_chars:
