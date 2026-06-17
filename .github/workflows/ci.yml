@@ -63,9 +63,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           push: true
-          tags: |
-            ${{ vars.DOCKER_HUB_USERNAME }}/cicd-app:latest
-            ${{ vars.DOCKER_HUB_USERNAME }}/cicd-app:${{ github.sha }}
+          tags: ${{ vars.DOCKER_HUB_USERNAME }}/cicd-app:latest
 
   deploy:
     needs: build
@@ -82,9 +80,9 @@ jobs:
           script: |
             docker pull ${{ vars.DOCKER_HUB_USERNAME }}/cicd-app:${{ github.sha }}
             docker stop app || true
-            docker rm app || true
+            docker rm app || true 
             docker run -d --name app -p 8000:8000 \
-              ${{ vars.DOCKER_HUB_USERNAME }}/cicd-app:${{ github.sha }}
+              ${{ vars.DOCKER_HUB_USERNAME }}/cicd-app:latest
 
   ai-reviews:
     runs-on: ubuntu-latest
@@ -113,6 +111,7 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENV: prod
         run: |
           uv run -m src.review \
             --pr-number ${{ github.event.pull_request.number }} \
