@@ -78,7 +78,7 @@ jobs:
           username: gcp-deploy
           key: ${{ secrets.VPS_KEY }}
           script: |
-            docker pull ${{ vars.DOCKER_HUB_USERNAME }}/cicd-app:${{ github.sha }}
+            docker pull ${{ vars.DOCKER_HUB_USERNAME }}/cicd-app:latest
             docker stop app || true
             docker rm app || true 
             docker run -d --name app -p 8000:8000 \
