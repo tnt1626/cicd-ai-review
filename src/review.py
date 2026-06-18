@@ -80,8 +80,6 @@ def generate_review(diff: str) -> str:
             mlflow.log_text(system_prompt, "system_prompt.md")
             mlflow.log_text(diff, "input_diff.txt")
 
-            mlflow.log_artifact(str(Path(__file__).parent.parent / "text" / "system_prompt.md"))
-
             start_time = time.perf_counter()
             response = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
