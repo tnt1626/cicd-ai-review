@@ -34,6 +34,7 @@ through MFflow when running script `review.py`
 
 
 ## 4. Tag
-| Tag Name      | Data Type | Description                  |
-|:--------------|:----------|:-----------------------------|
-| `status`      | String    | The status of the experiment |
+| Tag Name | Data Type | Description                  |
+|:---------|:----------|:-----------------------------|
+| `status` | String    | The status of the experiment |
+| `error`  | String    | The detail of the experiment |
