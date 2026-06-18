@@ -8,6 +8,7 @@ dependencies = [
     "fastapi>=0.136.3",
     "groq>=1.4.0",
     "httpx>=0.28.1",
+    "mlflow>=3.13.0",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.4.0",
     "python-dotenv>=1.2.2",
