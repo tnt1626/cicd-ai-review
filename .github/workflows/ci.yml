@@ -50,6 +50,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    if: github.event_name == 'pull_request' 
+    needs: ai-reviews
+
     strategy:
       matrix:
         python-version: ["3.12", "3.13"]
@@ -70,6 +73,8 @@ jobs:
         run: uv sync --frozen
       
       - name: Run tests
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
         run: uv run pytest
 
   build:
