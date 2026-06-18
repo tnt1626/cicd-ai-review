@@ -14,7 +14,7 @@ async def read_message(day: int):
         "day": day
     }
 
-@app.get("reviews/stats")
+@app.get("/reviews/stats")
 async def get_reviews_stats():
     response = await mlflow_reviews_stats()
     return response
