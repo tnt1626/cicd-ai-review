@@ -8,7 +8,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 from groq import APIError, Groq, RateLimitError
 
-PROMPT_VERSION = 'v0.2'
 
 load_dotenv()
 api_key = os.environ.get("GROQ_API_KEY")
@@ -37,7 +36,7 @@ def truncate_diff(diff: str, max_chars: int = 15000) -> str:
 
 
 def get_system_prompt() -> str:
-    loaded = mlflow.load_prompt("prompts:/ai-review-prompt@production")
+    loaded = mlflow.genai.load_prompt("prompts:/ai-review-prompt@production")
     system_prompt = loaded.template
     return system_prompt
 
@@ -70,19 +69,17 @@ def generate_review(diff: str) -> str:
     prepare_mlflow_run()
     with mlflow.start_run():
         try:
-            mlflow.log_param('model_name', 'llama-3.3-70b-versatile')
-            mlflow.log_param('prompt_version', PROMPT_VERSION)
-            mlflow.log_param('truncated', len(diff) >= 15000)
-            mlflow.log_metric('diff_size_chars', len(diff))
-
             user_prompt = get_user_prompt(diff)
             system_prompt = get_system_prompt()
-            prompt = mlflow.register_prompt(
+            prompt = mlflow.genai.register_prompt(
                 name="ai-review-prompt",
                 template=system_prompt,
                 commit_message="Auditor persona",
             )
             mlflow.log_param('prompt_version', prompt.version)
+            mlflow.log_param('model_name', 'llama-3.3-70b-versatile')
+            mlflow.log_param('truncated', len(diff) >= 15000)
+            mlflow.log_metric('diff_size_chars', len(diff))
             mlflow.log_text(diff, "input_diff.txt")
 
             start_time = time.perf_counter()
