@@ -37,9 +37,9 @@ def truncate_diff(diff: str, max_chars: int = 15000) -> str:
 
 
 def get_system_prompt() -> str:
-    file_path = Path(__file__).parent.parent / "text" / "system_prompt.md"
-    with open(file_path, "r", encoding="utf-8") as f:
-        return f.read()
+    loaded = mlflow.load_prompt("prompts:/ai-review-prompt@production")
+    system_prompt = loaded.template
+    return system_prompt
 
 def get_diff() -> str:
     # 1. stdin (pipe)
@@ -63,7 +63,7 @@ def get_user_prompt(diff: str) -> str:
 def save_review_text(review_text: str):
     file_path = Path(__file__).parent.parent / "text" / "review.md"
     with open(file_path, "w", encoding="utf-8") as f:
-            f.write(review_text)
+        f.write(review_text)
 
 
 def generate_review(diff: str) -> str:
@@ -77,7 +77,12 @@ def generate_review(diff: str) -> str:
 
             user_prompt = get_user_prompt(diff)
             system_prompt = get_system_prompt()
-            mlflow.log_text(system_prompt, "system_prompt.md")
+            prompt = mlflow.register_prompt(
+                name="ai-review-prompt",
+                template=system_prompt,
+                commit_message="Auditor persona",
+            )
+            mlflow.log_param('prompt_version', prompt.version)
             mlflow.log_text(diff, "input_diff.txt")
 
             start_time = time.perf_counter()
