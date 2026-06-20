@@ -9,7 +9,7 @@ through MFflow when running script `review.py`
 | Parameter Name | Data Type | Description | Example |
 | :--- | :--- | :--- | :--- |
 | `model_name` | String | The name or version of the LLM used for the code review. | `"gpt-4-turbo"`, `"claude-3-opus"` |
-| `prompt_version` | String | The version identifier of the system prompt or template used. | `"v1.2"`, `"prompt_strict_review"` |
+| `prompt_version` | String | The version identifier of the system prompt or template used. | `1`, `3` |
 | `truncated` | Boolean | A flag indicating whether the diff content was truncated due to exceeding the context window limit. | `True`, `False` |
 
 
