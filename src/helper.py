@@ -3,28 +3,24 @@ import asyncio
 import pandas as pd
 from datetime import datetime
 
+EMPTY_STATS = {
+    'total_reviews': 0,
+    'avg_latency_seconds': 0.0,
+    'avg_token_count_output': 0.0,
+    'most_used_model': 'N/A',
+    'last_review_at': 'N/A'
+}
+
 async def mlflow_reviews_stats():
     client = mlflow.MlflowClient()
     experiment = await asyncio.to_thread(client.get_experiment_by_name, 'pr-reviews-prod')
     if not experiment:
-        return {
-            'total_reviews': 0,
-            'avg_latency_seconds': 0.0,
-            'avg_token_count_output': 0.0,
-            'most_used_model': 'N/A',
-            'last_review_at': 'N/A'
-        }
+        return 
 
     experiment_id = experiment.experiment_id
     runs = await asyncio.to_thread(client.search_runs, experiment_ids=[experiment_id])
     if not runs:
-        return {
-            'total_reviews': 0,
-            'avg_latency_seconds': 0.0,
-            'avg_token_count_output': 0.0,
-            'most_used_model': 'N/A',
-            'last_review_at': 'N/A'
-        }
+        return EMPTY_STATS
     
     data = []
     for run in runs:
@@ -46,13 +42,7 @@ async def mlflow_reviews_stats():
     df = pd.DataFrame(data)
 
     if df.empty or df['run_at'].isnull().all():
-        return {
-            'total_reviews': 0,
-            'avg_latency_seconds': 0.0,
-            'avg_token_count_output': 0.0,
-            'most_used_model': 'N/A',
-            'last_review_at': 'N/A'
-        }
+        return EMPTY_STATS
 
     modes = df['model'].mode()
     most_used_model = modes[0] if not modes.empty else 'unknown'
