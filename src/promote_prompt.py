@@ -5,10 +5,10 @@ from mlflow import MlflowClient
 def main():
     """Promote an MLflow prompt version to the 'production' alias.
 
-    Usage: uv run scripts/promote_prompt.py <version_number>
+    Usage: uv run src/promote_prompt.py <version_number>
     """
     if len(sys.argv) < 2:
-        print(f"Usage: promote_prompt.py <version_number", file=sys.stderr)
+        print("Usage: promote_prompt.py <version_number>", file=sys.stderr)
         sys.exit(1)
 
     version = sys.argv[1]

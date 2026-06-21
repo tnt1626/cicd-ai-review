@@ -15,7 +15,7 @@ async def mlflow_reviews_stats():
     client = mlflow.MlflowClient()
     experiment = await asyncio.to_thread(client.get_experiment_by_name, 'pr-reviews-prod')
     if not experiment:
-        return 
+        return EMPTY_STATS
 
     experiment_id = experiment.experiment_id
     runs = await asyncio.to_thread(client.search_runs, experiment_ids=[experiment_id])

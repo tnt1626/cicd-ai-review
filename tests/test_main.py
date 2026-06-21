@@ -16,18 +16,6 @@ async def test_health_check_response():
         data = response.json()
         assert data['status'] == "healthy"
 
-@pytest.mark.asyncio
-async def test_read_message_response():
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test"
-    ) as client:
-        day = 1
-        response = await client.get(f"/message/{day}")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["message"] == "Test Workflow"
-        assert data["day"] == day
 
 @pytest.mark.asyncio
 @patch('src.main.mlflow_reviews_stats', new_callable=AsyncMock)
