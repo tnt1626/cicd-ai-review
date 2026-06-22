@@ -9,6 +9,7 @@ dependencies = [
     "groq>=1.4.0",
     "httpx>=0.28.1",
     "mlflow>=3.13.0",
+    "prometheus-fastapi-instrumentator>=8.0.0",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.4.0",
     "python-dotenv>=1.2.2",
