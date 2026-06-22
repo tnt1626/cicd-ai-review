@@ -1,7 +1,12 @@
 from fastapi import FastAPI
+from prometheus_fastapi_instrumentator import Instrumentator
 from src.helper import mlflow_reviews_stats
+import src.review
+
 
 app = FastAPI()
+
+Instrumentator().instrument(app).expose(app)
 
 @app.get("/health")
 async def health_check():
