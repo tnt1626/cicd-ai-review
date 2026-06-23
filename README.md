@@ -8,16 +8,17 @@ A GitHub Actions pipeline that automatically tests, builds a Docker image, deplo
 
 ## Stack
 
-| Layer | Tool |
-|---|---|
-| API | FastAPI + Python 3.13 |
-| Test | pytest + httpx |
-| Container | Docker + Docker Hub |
-| CI/CD | GitHub Actions |
-| AI | Groq API (Llama-3.3-70b-versatile) |
-| Experiment Tracking | MLflow 3.x (self-hosted on GCP VM) |
-| Prompt Versioning | MLflow Prompt Registry |
-| Server | GCP e2-medium + Nginx + HTTPS (nip.io) |
+| Layer               | Tool                                   |
+|---------------------|----------------------------------------|
+| API                 | FastAPI + Python 3.13                  |
+| Test                | pytest + httpx                         |
+| Container           | Docker + Docker Hub                    |
+| CI/CD               | GitHub Actions                         |
+| AI                  | Groq API (Llama-3.3-70b-versatile)     |
+| Experiment Tracking | MLflow 3.x (self-hosted on GCP VM)     |
+| Prompt Versioning   | MLflow Prompt Registry                 |
+| Server              | GCP e2-medium + Nginx + HTTPS (nip.io) |
+| Monitoring          | Prometheus + Grafana                   |
 
 ---
 
@@ -90,6 +91,33 @@ Three system prompt personas were tested against the same diff to compare review
 ## Prompt Registry & Versioning
 
 System prompts are version-controlled using MLflow's **Prompt Registry** — a separate system from the Model Registry, purpose-built for text templates rather than ML model artifacts.
+
+## Monitoring with Prometheus + Grafana
+
+The FastAPI server exposes Prometheus-compatible metrics at `/metrics`
+via `prometheus-fastapi-instrumentator`, scraped every 15 seconds over
+HTTPS by a Prometheus instance.
+
+**Design decision — why review-specific metrics live in MLflow, not Prometheus:**
+`review.py` runs as a short-lived CLI process inside GitHub Actions —
+it exits within seconds of finishing a review. Prometheus's pull model
+requires scraping a persistent `/metrics` endpoint at fixed intervals,
+so any custom metric defined inside that short-lived process would be
+invisible by the next scrape. Instead:
+
+- **Prometheus + Grafana** monitor what they can reliably observe — the
+  long-running FastAPI server (`/health`, `/reviews/stats`): request
+  rate, latency (p95), and error rate.
+- **MLflow** tracks everything review-specific (latency, token usage,
+  prompt version) per run, with no scrape-timing constraint.
+
+The dashboard links directly to `GET /reviews/stats` for review-specific
+numbers, rather than forcing both systems to track the same thing twice.
+
+*Grafana dashboard — request volume, latency, and error rate:*
+![Grafana dashboard](attachments/grafana_dashboard.png)
+
+Dashboard definition stored as code: [`grafana/dashboard.json`](grafana/dashboard.json)
 
 ### How it works
 
@@ -192,12 +220,12 @@ This started as a 2-week project built from scratch as a beginner to DevOps, the
 - **Cloud infrastructure** — provisioning and configuring a GCP VM, reserving a static IP, upgrading machine types under real memory pressure
 - **AI integration** — Groq API, prompt engineering, GitHub REST API for automated comments
 - **MLOps fundamentals** — experiment tracking with MLflow, the distinction between Model Registry and Prompt Registry, alias-based deployment workflows (vs. the now-deprecated Stages API), and using tracked metrics to make data-driven prompt decisions
-
+- **Observability** — Prometheus pull-model constraints, Grafana dashboards as code, and recognizing when two monitoring systems should stay separate rather than be forced to overlap
 ---
 
 ## Possible extensions
 
-- [ ] Prometheus + Grafana — real-time monitoring and alerting (Phase 2)
+- [x] Prometheus + Grafana — real-time monitoring and alerting (Phase 2)
 - [ ] Terraform + Ansible — provision infrastructure as code instead of manual setup (Phase 3)
 - [ ] Webhook server — support any repo without GitHub Actions setup
 - [ ] Web dashboard — view review history and stats with a proper UI
