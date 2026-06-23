@@ -50,9 +50,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    if: github.event_name == 'pull_request' 
-    needs: ai-reviews
-
     strategy:
       matrix:
         python-version: ["3.12", "3.13"]
