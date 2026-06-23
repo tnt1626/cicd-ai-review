@@ -1,3 +1,4 @@
+import os
 import mlflow
 import asyncio
 import pandas as pd
@@ -12,6 +13,7 @@ EMPTY_STATS = {
 }
 
 async def mlflow_reviews_stats():
+    mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5001"))
     client = mlflow.MlflowClient()
     experiment = await asyncio.to_thread(client.get_experiment_by_name, 'pr-reviews-prod')
     if not experiment:
