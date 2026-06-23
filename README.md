@@ -118,7 +118,7 @@ system_prompt = loaded.template
 4. Promote it to production:
 
 ```bash
-uv run scripts/promote_prompt.py <version_number>
+uv run src/promote_prompt.py <version_number>
 ```
 
 5. The bot uses the new version on its very next run — no code changes, no redeploy required.

@@ -7,7 +7,6 @@ import mlflow
 from pathlib import Path
 from dotenv import load_dotenv
 from groq import APIError, Groq, RateLimitError
-from prometheus_client import Counter, Gauge, Histogram
 
 
 load_dotenv()
@@ -22,10 +21,6 @@ env = os.environ.get("ENV", "dev")
 
 MAX_CHARS = 15000
 
-review_counter = Counter("ai_reviews_total", "Total AI reviews run")
-review_latency = Histogram("ai_review_latency_seconds", "Review latency")
-review_errors = Counter("ai_review_errors_total", "Total review errors", ["error_type"])
-active_reviews = Gauge("ai_reviews_in_progress", "Reviews currently running")
 
 def prepare_mlflow_run():
     """
@@ -99,8 +94,6 @@ def generate_review(diff: str) -> str:
     Define main logic for generting review using LLM
     and monitor with Mlflow
     """
-    active_reviews.inc()
-    review_counter.inc()
     prepare_mlflow_run()
     with mlflow.start_run():
         try:
@@ -129,8 +122,6 @@ def generate_review(diff: str) -> str:
             end_time = time.perf_counter()
             response_latency_seconds = end_time - start_time
 
-            review_latency.observe(response_latency_seconds)
-
             mlflow.log_metric('token_count_input', response.usage.prompt_tokens)
             mlflow.log_metric('token_count_output', response.usage.completion_tokens)
             mlflow.log_metric('latency_seconds', round(response_latency_seconds, 2))
@@ -141,13 +132,10 @@ def generate_review(diff: str) -> str:
 
             mlflow.set_tag('status', 'success')
         except Exception as e:
-            review_errors.labels(error_type=type(e).__name__).inc()
-            active_reviews.dec()
             mlflow.set_tag('status', 'failed')
             mlflow.set_tag('error', str(e))
             raise
     
-    active_reviews.dec()
     return review_text
 
 
