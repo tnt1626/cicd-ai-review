@@ -1,0 +1,63 @@
+services:
+  app:
+    image: tnt1626/cicd-app:latest
+    restart: unless-stopped
+    container_name: app
+    ports:
+      - "8000:8000"
+    env_file: .env
+    depends_on: 
+      - mlflow
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    restart: unless-stopped
+    container_name: mlflow
+    ports:
+      - "127.0.0.1:5001:5001"
+    environment:
+      - MLFLOW_SERVER_ENABLE_JOB_EXECUTION=false
+    mem_limit: 1g
+    memswap_limit: 1g
+    command: >
+      mlflow server 
+        --host 0.0.0.0 
+        --port 5001 
+        --workers 1 
+        --backend-store-uri sqlite:////data/mlflow.db 
+        --default-artifact-root mlflow-artifacts:/data/artifacts 
+        --serve-artifacts 
+        --artifacts-destination /data/artifacts 
+        --allowed-hosts "mlflow.35.253.241.93.nip.io,localhost:*" 
+        --cors-allowed-origins "https://mlflow.35.253.241.93.nip.io"
+    volumes: 
+      - "/home/gcp-deploy/mlflow-data:/data"
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    ports: 
+      - "127.0.0.1:9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    volumes: 
+      - "./prometheus.yml:/etc/prometheus/prometheus.yml"
+      - "prom_data:/prometheus"
+
+  grafana:
+    image: grafana/grafana-enterprise
+    container_name: grafana
+    restart: unless-stopped
+    ports: 
+      - "127.0.0.1:3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+    volumes:
+      - "./grafana:/etc/grafana/provisioning/datasources"
+      - "grafana_data:/var/lib/grafana"
+
+volumes:
+  prom_data:
+  grafana_data:

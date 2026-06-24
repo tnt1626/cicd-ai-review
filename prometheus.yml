@@ -3,12 +3,6 @@ global:
 
 scrape_configs:
   - job_name: "ai-review-app"
-    scheme: https
     static_configs:
       - targets:
-          - "35.253.241.93.nip.io"
-
-  - job_name: "prometheus"
-    static_configs:
-      - targets: 
-        - "localhost:9090"
+          - "app:8000"
