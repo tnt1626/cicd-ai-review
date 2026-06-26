@@ -116,4 +116,4 @@ jobs:
           script: |
             cd /home/gcp-deploy
             docker compose -f docker-compose.prod.yml pull app
-            docker compose -f docker-compose.prod.yml up -d --no-deps app
+            docker compose -f docker-compose.prod.yml up -d --no-deps app --force-recreate app
