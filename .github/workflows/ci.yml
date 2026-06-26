@@ -114,9 +114,6 @@ jobs:
           username: gcp-deploy
           key: ${{ secrets.VPS_KEY }}
           script: |
-            docker pull ${{ vars.DOCKER_HUB_USERNAME }}/cicd-app:latest
-            docker stop app || true
-            docker rm app || true 
-            docker run -d --name app -p 8000:8000 \
-              -e MLFLOW_TRACKING_URI="${{ secrets.MLFLOW_TRACKING_URI }}" \
-              ${{ vars.DOCKER_HUB_USERNAME }}/cicd-app:latest
+            cd /home/gcp-deploy
+            docker compose -f docker-compose.prod.yml pull app
+            docker compose -d docker-compose.prod.yml up -d --no-deps app
