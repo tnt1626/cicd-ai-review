@@ -92,33 +92,6 @@ Three system prompt personas were tested against the same diff to compare review
 
 System prompts are version-controlled using MLflow's **Prompt Registry** — a separate system from the Model Registry, purpose-built for text templates rather than ML model artifacts.
 
-## Monitoring with Prometheus + Grafana
-
-The FastAPI server exposes Prometheus-compatible metrics at `/metrics`
-via `prometheus-fastapi-instrumentator`, scraped every 15 seconds over
-HTTPS by a Prometheus instance.
-
-**Design decision — why review-specific metrics live in MLflow, not Prometheus:**
-`review.py` runs as a short-lived CLI process inside GitHub Actions —
-it exits within seconds of finishing a review. Prometheus's pull model
-requires scraping a persistent `/metrics` endpoint at fixed intervals,
-so any custom metric defined inside that short-lived process would be
-invisible by the next scrape. Instead:
-
-- **Prometheus + Grafana** monitor what they can reliably observe — the
-  long-running FastAPI server (`/health`, `/reviews/stats`): request
-  rate, latency (p95), and error rate.
-- **MLflow** tracks everything review-specific (latency, token usage,
-  prompt version) per run, with no scrape-timing constraint.
-
-The dashboard links directly to `GET /reviews/stats` for review-specific
-numbers, rather than forcing both systems to track the same thing twice.
-
-*Grafana dashboard — request volume, latency, and error rate:*
-![Grafana dashboard](attachments/grafana_dashboard.png)
-
-Dashboard definition stored as code: [`grafana/dashboard.json`](grafana/dashboard.json)
-
 ### How it works
 
 Each time the bot runs, the current system prompt is registered as a new version in MLflow (MLflow only creates a new version if the content actually changed):
@@ -156,6 +129,34 @@ uv run src/promote_prompt.py <version_number>
 - Prompt changes are versioned and auditable, just like code
 - Rolling back is instant — just re-promote an older version's alias
 - A/B testing prompt variants is straightforward: compare run metrics grouped by `prompt_version` in MLflow (see `PROMPT_EXPERIMENTS.md`)
+
+
+## Monitoring with Prometheus + Grafana
+
+The FastAPI server exposes Prometheus-compatible metrics at `/metrics`
+via `prometheus-fastapi-instrumentator`, scraped every 15 seconds over
+HTTPS by a Prometheus instance.
+
+**Design decision — why review-specific metrics live in MLflow, not Prometheus:**
+`review.py` runs as a short-lived CLI process inside GitHub Actions —
+it exits within seconds of finishing a review. Prometheus's pull model
+requires scraping a persistent `/metrics` endpoint at fixed intervals,
+so any custom metric defined inside that short-lived process would be
+invisible by the next scrape. Instead:
+
+- **Prometheus + Grafana** monitor what they can reliably observe — the
+  long-running FastAPI server (`/health`, `/reviews/stats`): request
+  rate, latency (p95), and error rate.
+- **MLflow** tracks everything review-specific (latency, token usage,
+  prompt version) per run, with no scrape-timing constraint.
+
+The dashboard links directly to `GET /reviews/stats` for review-specific
+numbers, rather than forcing both systems to track the same thing twice.
+
+*Grafana dashboard — request volume, latency, and error rate:*
+![Grafana dashboard](attachments/grafana_dashboard.png)
+
+Dashboard definition stored as code: [`grafana/dashboard.json`](grafana/dashboard.json)
 
 ---
 
