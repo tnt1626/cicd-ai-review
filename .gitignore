@@ -222,3 +222,8 @@ mlflow.db
 mlartifacts
 text/diff.txt
 text/review.md
+terraform/*.tfstate*
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+*./tfvars
+*.tfvars
