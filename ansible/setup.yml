@@ -1,0 +1,30 @@
+- hosts: all
+  become: true
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install Docker
+      shell: curl -fsSL https://get.docker.com | sh
+      args:
+        creates: /usr/bin/docker
+
+    - name: Install Docker Compose plugin
+      apt:
+        name: docker-compose-plugin
+        state: present
+
+    - name: Create deploy user
+      user:
+        name: do-deploy
+        groups: docker
+        shell: /bin/bash
+        create_home: yes
+
+    - name: Install Nginx
+      apt:
+        name: nginx 
+        state:
+          present
