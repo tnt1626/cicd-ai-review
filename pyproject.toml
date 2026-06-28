@@ -5,6 +5,7 @@ description = "Build CICD Pipeline for AI Code Review"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "ansible>=14.1.0",
     "fastapi>=0.136.3",
     "groq>=1.4.0",
     "httpx>=0.28.1",
