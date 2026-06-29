@@ -30,7 +30,7 @@ jobs:
         working-directory: terraform/
         env:
           TF_VAR_do_token: ${{ secrets.DO_TOKEN }}
-          TF_VAT_ssh_key_id: ${{ secrets.DO_SSH_KEY_ID }}
+          TF_VAR_ssh_key_id: ${{ secrets.DO_SSH_KEY_ID }}
         
 
       
