@@ -9,7 +9,7 @@ terraform {
   backend "s3" {
     endpoints = {
       s3 = "https://sgp1.digitaloceanspaces.com"
-    }
+    } 
     bucket                      = "cicd-ai-review-tfstate"
     key                         = "terraform.tfstate"
     region                      = "us-east-1"
