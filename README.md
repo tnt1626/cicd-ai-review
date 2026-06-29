@@ -19,6 +19,7 @@ A GitHub Actions pipeline that automatically tests, builds a Docker image, deplo
 | Prompt Versioning   | MLflow Prompt Registry                 |
 | Server              | GCP e2-medium + Nginx + HTTPS (nip.io) |
 | Monitoring          | Prometheus + Grafana                   |
+| IaC                 | Terraform + Ansible (DigitalOcean)     |
 
 ---
 
@@ -92,6 +93,33 @@ Three system prompt personas were tested against the same diff to compare review
 
 System prompts are version-controlled using MLflow's **Prompt Registry** — a separate system from the Model Registry, purpose-built for text templates rather than ML model artifacts.
 
+## Monitoring with Prometheus + Grafana
+
+The FastAPI server exposes Prometheus-compatible metrics at `/metrics`
+via `prometheus-fastapi-instrumentator`, scraped every 15 seconds over
+HTTPS by a Prometheus instance.
+
+**Design decision — why review-specific metrics live in MLflow, not Prometheus:**
+`review.py` runs as a short-lived CLI process inside GitHub Actions —
+it exits within seconds of finishing a review. Prometheus's pull model
+requires scraping a persistent `/metrics` endpoint at fixed intervals,
+so any custom metric defined inside that short-lived process would be
+invisible by the next scrape. Instead:
+
+- **Prometheus + Grafana** monitor what they can reliably observe — the
+  long-running FastAPI server (`/health`, `/reviews/stats`): request
+  rate, latency (p95), and error rate.
+- **MLflow** tracks everything review-specific (latency, token usage,
+  prompt version) per run, with no scrape-timing constraint.
+
+The dashboard links directly to `GET /reviews/stats` for review-specific
+numbers, rather than forcing both systems to track the same thing twice.
+
+*Grafana dashboard — request volume, latency, and error rate:*
+![Grafana dashboard](attachments/grafana_dashboard.png)
+
+Dashboard definition stored as code: [`grafana/dashboard.json`](grafana/dashboard.json)
+
 ### How it works
 
 Each time the bot runs, the current system prompt is registered as a new version in MLflow (MLflow only creates a new version if the content actually changed):
@@ -130,33 +158,38 @@ uv run src/promote_prompt.py <version_number>
 - Rolling back is instant — just re-promote an older version's alias
 - A/B testing prompt variants is straightforward: compare run metrics grouped by `prompt_version` in MLflow (see `PROMPT_EXPERIMENTS.md`)
 
+---
 
-## Monitoring with Prometheus + Grafana
+## Infrastructure as Code — Terraform + Ansible
 
-The FastAPI server exposes Prometheus-compatible metrics at `/metrics`
-via `prometheus-fastapi-instrumentator`, scraped every 15 seconds over
-HTTPS by a Prometheus instance.
+A second environment on DigitalOcean is provisioned entirely through code, separate from the manually-configured GCP VM. This demonstrates the difference between "I configured a server by hand" and "anyone can recreate this infrastructure with one command."
 
-**Design decision — why review-specific metrics live in MLflow, not Prometheus:**
-`review.py` runs as a short-lived CLI process inside GitHub Actions —
-it exits within seconds of finishing a review. Prometheus's pull model
-requires scraping a persistent `/metrics` endpoint at fixed intervals,
-so any custom metric defined inside that short-lived process would be
-invisible by the next scrape. Instead:
+### Terraform — provisioning
 
-- **Prometheus + Grafana** monitor what they can reliably observe — the
-  long-running FastAPI server (`/health`, `/reviews/stats`): request
-  rate, latency (p95), and error rate.
-- **MLflow** tracks everything review-specific (latency, token usage,
-  prompt version) per run, with no scrape-timing constraint.
+```
+terraform/
+├── main.tf          # provider + remote state backend
+├── variables.tf      # input variables (token, region, size, ssh key)
+├── droplet.tf         # the DigitalOcean Droplet resource
+├── firewall.tf         # cloud-level firewall rules (22, 80, 443 inbound)
+└── outputs.tf           # droplet_ip, exposed after apply
+```
 
-The dashboard links directly to `GET /reviews/stats` for review-specific
-numbers, rather than forcing both systems to track the same thing twice.
+- **Remote state** is stored on DigitalOcean Spaces (S3-compatible), not locally — so the state file isn't lost if a laptop dies, and multiple people (or CI) can safely run Terraform against the same infrastructure.
+- **Cloud-level firewall**, not just UFW inside the OS — this matters because Docker silently bypasses UFW when publishing container ports (`-p 8000:8000` writes directly to iptables' FORWARD chain, which UFW never inspects). A cloud-level firewall blocks traffic *before* it reaches the VM at all, so it isn't bypassable by anything running inside Docker.
+- **CI integration:** a `terraform plan` runs automatically in GitHub Actions on every change to `terraform/**`, so infrastructure changes get reviewed like code. `terraform apply` stays manual — infrastructure changes are a deliberate decision, not an automatic side effect of a push.
 
-*Grafana dashboard — request volume, latency, and error rate:*
-![Grafana dashboard](attachments/grafana_dashboard.png)
+### Ansible — configuration
 
-Dashboard definition stored as code: [`grafana/dashboard.json`](grafana/dashboard.json)
+Terraform's job ends once the Droplet exists. Ansible takes over from there — installing Docker, the Compose plugin, Nginx, and a non-root deploy user, the same steps that were originally run by hand on the GCP VM in Phase 1, now captured as a reusable, idempotent playbook (`ansible/setup.yml`).
+
+```bash
+terraform apply              # creates the Droplet
+ansible-playbook -i $(terraform output -raw droplet_ip), ansible/setup.yml -u root
+                              # configures it
+```
+
+A fresh Ubuntu Droplet goes from blank to fully configured in under a minute, with no manual SSH session required beyond the very first connection.
 
 ---
 
@@ -207,6 +240,8 @@ Go to your repo → **Settings → Secrets and variables → Actions → New rep
 | `VPS_HOST` | External IP of your GCP VM (Compute Engine → VM Instances) |
 | `VPS_KEY` | SSH private key — run `ssh-keygen -t ed25519 -C "gcp-deploy"` locally, paste the private key here |
 | `MLFLOW_TRACKING_URI` | HTTPS URL of your MLflow server (e.g. `https://mlflow.your-vm-ip.nip.io`) |
+| `DO_TOKEN` | DigitalOcean → API → Tokens → Generate New Token (needed for Terraform CI) |
+| `DO_SSH_KEY_ID` | DigitalOcean → Settings → Security → SSH Keys → numeric ID of an uploaded key |
 
 ---
 
@@ -222,12 +257,13 @@ This started as a 2-week project built from scratch as a beginner to DevOps, the
 - **AI integration** — Groq API, prompt engineering, GitHub REST API for automated comments
 - **MLOps fundamentals** — experiment tracking with MLflow, the distinction between Model Registry and Prompt Registry, alias-based deployment workflows (vs. the now-deprecated Stages API), and using tracked metrics to make data-driven prompt decisions
 - **Observability** — Prometheus pull-model constraints, Grafana dashboards as code, and recognizing when two monitoring systems should stay separate rather than be forced to overlap
+- **Infrastructure as Code** — Terraform providers, remote state, and the provisioning/configuration split with Ansible; discovering that Docker bypasses host-level firewalls (UFW) entirely, and why cloud-level firewalls close that gap
 ---
 
 ## Possible extensions
 
 - [x] Prometheus + Grafana — real-time monitoring and alerting (Phase 2)
-- [ ] Terraform + Ansible — provision infrastructure as code instead of manual setup (Phase 3)
-- [ ] Webhook server — support any repo without GitHub Actions setup
+- [x] Terraform + Ansible — provision infrastructure as code instead of manual setup (Phase 3)
+- [ ] Webhook server — support any repo without GitHub Actions setup, and enable custom Prometheus metrics for the review pipeline itself (currently only the long-running FastAPI server is instrumented — `review.py` runs as a short-lived CI process and can't be scraped by Prometheus's pull model)
 - [ ] Web dashboard — view review history and stats with a proper UI
 - [ ] Kubernetes — replace `docker run` / `docker compose` with a k8s deployment
