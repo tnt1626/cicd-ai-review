@@ -6,7 +6,7 @@ variable "do_token" {
 
 variable "region" {
   type        = string
-  default     = "sgp1"
+  default     = "us-east-1"
   description = "Region of the VM"
 }
 
