@@ -12,7 +12,7 @@ variable "region" {
 
 variable "size" {
   type        = string
-  default     = "s-1vcpu-1gb"
+  default     = "s-2vcpu-1gb"
   description = "Droplet size"
 }
 
