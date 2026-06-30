@@ -260,6 +260,29 @@ This started as a 2-week project built from scratch as a beginner to DevOps, the
 - **Infrastructure as Code** — Terraform providers, remote state, and the provisioning/configuration split with Ansible; discovering that Docker bypasses host-level firewalls (UFW) entirely, and why cloud-level firewalls close that gap
 ---
 
+## Engineering Log — Real Issues & Fixes
+
+This project wasn't built without friction. Every non-trivial 
+infrastructure problem was debugged, fixed, and documented as a 
+GitHub Issue — not silently patched. Worth reading if you're hitting 
+the same wall.
+
+| #                      | Issue                                      | Root cause                                                                                                  |
+|------------------------|--------------------------------------------|-------------------------------------------------------------------------------------------------------------|
+| [#7](../../issues/7)   | VM on GCP out of memory (OOM)              | e2-micro (1GB RAM) couldn't handle app + MLflow containers together                                         |
+| [#8](../../issues/8)   | Header checking MLflow                     | MLflow's host validation rejected requests without proper config                                            |
+| [#9](../../issues/9)   | Invalid Host header security block         | Needed `--allowed-hosts` to fix DNS-rebinding protection                                                    |
+| [#11](../../issues/11) | IP change                                  | Ephemeral GCP IP changed after VM restart, breaking SSH and tracking URIs                                   |
+| [#12](../../issues/12) | MLflow artifact upload failed              | Local path resolution issue — needed `--serve-artifacts` for remote tracking                                |
+| [#14](../../issues/14) | MLflow test fails on CI/CD                 | —                                                                                                           |
+| [#17](../../issues/17) | Invalid Host header even with valid domain | MLflow 3.x's stricter host validation needed explicit allowed hosts                                         |
+| [#19](../../issues/19) | Used wrong MLflow API                      | Model Registry vs Prompt Registry confusion — prompts need `register_prompt()`, not `register_model()`      |
+| [#20](../../issues/20) | MLflow UI shows INTERNAL_ERROR             | CORS blocking same-origin requests — separate from Host header validation                                   |
+| [#21](../../issues/21) | MLflow RAM leak to 2GB+ within minutes     | Default 4-worker config + unused GenAI job scheduler running in the background                              |
+| [#22](../../issues/22) | Custom Prometheus metrics removed          | Architectural mismatch — Prometheus's pull model can't scrape a short-lived CI process                      |
+| [#24](../../issues/24) | Docker bypasses UFW                        | Published container ports skip the host firewall entirely — fixed by binding internal services to 127.0.0.1 |
+| [#25](../../issues/25) | Prometheus unable to scrape FastAPI        | Docker network mismatch after moving to Docker Compose                                                      |
+
 ## Possible extensions
 
 - [x] Prometheus + Grafana — real-time monitoring and alerting (Phase 2)
